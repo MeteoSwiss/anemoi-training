@@ -296,7 +296,7 @@ class GraphForecaster(pl.LightningModule):
             on_step=True,
             logger=self.logger_enabled,
             rank_zero_only=True,
-            sync_dist=False,
+            sync_dist=True,
         )
         return train_loss
 

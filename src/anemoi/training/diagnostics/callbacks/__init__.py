@@ -240,7 +240,7 @@ class RolloutEval(Callback):
             prog_bar=False,
             logger=pl_module.logger_enabled,
             batch_size=bs,
-            sync_dist=False,
+            sync_dist=True,
             rank_zero_only=True,
         )
         for mname, mvalue in metrics.items():
@@ -252,7 +252,7 @@ class RolloutEval(Callback):
                 prog_bar=False,
                 logger=pl_module.logger_enabled,
                 batch_size=bs,
-                sync_dist=False,
+                sync_dist=True,
                 rank_zero_only=True,
             )
 
@@ -399,9 +399,7 @@ class PlotLoss(BasePlotCallback):
         if len(unique_group_list) > 20:
             LOGGER.warning("More than 20 groups detected, but colormap has only 20 colors.")
         # if all groups have count 1 use black color
-        bar_color_per_group = (
-            "k" if not np.any(group_counts - 1) else plt.get_cmap(cmap)(np.linspace(0, 1, len(unique_group_list)))
-        )
+        bar_color_per_group = plt.get_cmap(cmap)(np.linspace(0, 1, len(unique_group_list)))
 
         # set x-ticks
         x_tick_positions = np.cumsum(group_counts) - group_counts / 2 - 0.5
@@ -865,8 +863,8 @@ class AnemoiCheckpoint(ModelCheckpoint):
             save_metadata(lightning_checkpoint_filepath, metadata)
 
             # notify loggers
-            for logger in trainer.loggers:
-                logger.after_save_checkpoint(proxy(self))
+            # for logger in trainer.loggers:
+            #     logger.after_save_checkpoint(proxy(self))
 
 
 def get_callbacks(config: DictConfig) -> list:  # noqa: C901
