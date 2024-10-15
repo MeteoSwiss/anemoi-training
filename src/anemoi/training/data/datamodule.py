@@ -188,7 +188,7 @@ class AnemoiDatasetsDataModule(pl.LightningDataModule):
         return data
 
     def _get_dataloader(self, ds: NativeGridDataset, stage: str) -> DataLoader:
-        assert stage in {"training", "validation", "test"}
+        assert stage in {"training", "validation", "test", "predict"}
         return DataLoader(
             ds,
             batch_size=self.config.dataloader.batch_size[stage],
@@ -212,3 +212,6 @@ class AnemoiDatasetsDataModule(pl.LightningDataModule):
 
     def test_dataloader(self) -> DataLoader:
         return self._get_dataloader(self.ds_test, "test")
+
+    def predict_dataloader(self) -> DataLoader:
+        return self._get_dataloader(self.ds_test, "predict")

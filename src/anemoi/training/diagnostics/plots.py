@@ -518,7 +518,39 @@ def plot_flat_sample(
         )
 
     if sum(input_) != 0:
-        if vname == "mwd":
+        if vname in precip_and_related_fields:
+            # Create a custom colormap for precipitation
+            nws_precip_colors = cmap_precip
+            precip_colormap = ListedColormap(nws_precip_colors)
+
+            # Defining the actual precipitation accumulation levels in mm
+            cummulation_lvls = clevels
+            norm = BoundaryNorm(cummulation_lvls, len(cummulation_lvls) + 1)
+
+            # converting to mm from m
+            truth *= 1000.0
+            pred *= 1000.0
+            scatter_plot(
+                fig,
+                ax[4],
+                lon=lon,
+                lat=lat,
+                data=pred - input_,
+                cmap="bwr",
+                norm=TwoSlopeNorm(vcenter=0.0),
+                title=f"{vname} increment [pred - input]",
+            )
+            scatter_plot(
+                fig,
+                ax[5],
+                lon=lon,
+                lat=lat,
+                data=truth - input_,
+                cmap="bwr",
+                norm=TwoSlopeNorm(vcenter=0.0),
+                title=f"{vname} persist err",
+            )
+        elif vname == "mwd":
             scatter_plot(fig, ax[0], lon=lon, lat=lat, data=input_, cmap=cyclic_colormap, title=f"{vname} input")
             err_plot = error_plot_in_degrees(pred, input_)
             scatter_plot(
