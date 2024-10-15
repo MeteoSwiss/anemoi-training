@@ -164,6 +164,14 @@ class AnemoiDatasetsDataModule(pl.LightningDataModule):
             shuffle=False,
             label="test",
         )
+    
+    @cached_property
+    def ds_predict(self) -> NativeGridDataset:
+        return self._get_dataset(
+            open_dataset(OmegaConf.to_container(self.config.dataloader.test, resolve=True)),
+            shuffle=False,
+            label="predict",
+        )
 
     def _get_dataset(
         self,
@@ -214,4 +222,4 @@ class AnemoiDatasetsDataModule(pl.LightningDataModule):
         return self._get_dataloader(self.ds_test, "test")
 
     def predict_dataloader(self) -> DataLoader:
-        return self._get_dataloader(self.ds_test, "predict")
+        return  self._get_dataloader(self.ds_predict, "predict")

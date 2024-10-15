@@ -229,6 +229,8 @@ class NativeGridDataset(IterableDataset):
         for i in shuffled_chunk_indices:
             start = i - (self.multi_step - 1) * self.timeincrement
             end = i + (self.rollout + 1) * self.timeincrement
+            if self.label == "predict":
+                end -= self.timeincrement
 
             x = self.data[start : end : self.timeincrement]
             x = rearrange(x, "dates variables ensemble gridpoints -> dates ensemble gridpoints variables")
