@@ -530,6 +530,8 @@ def plot_flat_sample(
             # converting to mm from m
             truth *= 1000.0
             pred *= 1000.0
+            scatter_plot(fig, ax[0], lon=lon, lat=lat, data=input_, cmap=precip_colormap, norm=norm, title=f"{vname} input")
+            err_plot = error_plot_in_degrees(pred, input_)
             scatter_plot(
                 fig,
                 ax[4],
