@@ -41,7 +41,7 @@ from pytorch_lightning.utilities import rank_zero_only
 from anemoi.training.diagnostics.plots import init_plot_settings
 from anemoi.training.diagnostics.plots import plot_graph_node_features
 from anemoi.training.diagnostics.plots import plot_histogram
-from anemoi.training.diagnostics.plots import plot_loss
+from anemoi.training.diagnostics.plots import plot_losses
 from anemoi.training.diagnostics.plots import plot_power_spectrum
 from anemoi.training.diagnostics.plots import plot_predicted_multilevel_flat_sample
 
@@ -447,7 +447,6 @@ class GraphTrainableFeaturesPlot(BasePlotCallback):
         self.plot(trainer, model, tag="node_trainable_params", exp_log_tag="node_trainable_params")
 
 
-
 class PlotLoss(BasePlotCallback):
     """Plots the unsqueezed loss over rollouts."""
 
@@ -463,6 +462,7 @@ class PlotLoss(BasePlotCallback):
         super().__init__(config)
         self.parameter_names = None
         self.parameter_groups = self.config.diagnostics.plot.parameter_groups
+        self.spatial_group_mask = self.config.diagnostics.plot.get("spatial_group_mask", None)
         if self.parameter_groups is None:
             self.parameter_groups = {}
 
@@ -566,16 +566,41 @@ class PlotLoss(BasePlotCallback):
         # reorder parameter_names by position
         self.parameter_names = [parameter_names[i] for i in np.argsort(parameter_positions)]
 
+        if self.spatial_group_mask is not None:
+            spatial_mask = pl_module.model.graph_data[pl_module.model.model._graph_name_data][self.spatial_group_mask]
+            spatial_mask = spatial_mask.squeeze().to(batch.device)
+
+        sort_by_parameter_group, colors, xticks, legend_patches = self.sort_and_color_by_parameter_group
+
         batch = pl_module.model.pre_processors(batch, in_place=False)
         for rollout_step in range(pl_module.rollout):
             y_hat = outputs[1][rollout_step]
             y_true = batch[
                 :, pl_module.multi_step + rollout_step, ..., pl_module.data_indices.internal_data.output.full
             ]
-            loss = pl_module.loss(y_hat, y_true, squash=False).cpu().numpy()
+            loss = {"Loss": pl_module.loss(y_hat, y_true, squash=False).cpu().numpy()[sort_by_parameter_group]}
 
-            sort_by_parameter_group, colors, xticks, legend_patches = self.sort_and_color_by_parameter_group
-            fig = plot_loss(loss[sort_by_parameter_group], colors, xticks, legend_patches)
+            if self.spatial_group_mask is not None:
+                loss[f"Loss ({self.spatial_group_mask}=True)"] = (
+                    pl_module.loss(
+                        torch.where(spatial_mask.unsqueeze(-1), y_hat, 0),
+                        torch.where(spatial_mask.unsqueeze(-1), y_true, 0),
+                        squash=False,
+                    )
+                    .cpu()
+                    .numpy()[sort_by_parameter_group]
+                )
+                loss[f"Loss ({self.spatial_group_mask}=False)"] = (
+                    pl_module.loss(
+                        torch.where(~spatial_mask.unsqueeze(-1), y_hat, 0),
+                        torch.where(~spatial_mask.unsqueeze(-1), y_true, 0),
+                        squash=False,
+                    )
+                    .cpu()
+                    .numpy()[sort_by_parameter_group]
+                )
+
+            fig = plot_losses(loss, colors, xticks, legend_patches)
 
             self._output_figure(
                 logger,
@@ -650,12 +675,16 @@ class PlotSample(BasePlotCallback):
             ...,
             pl_module.data_indices.internal_data.output.full,
         ].cpu()
-        data = self.post_processors(input_tensor).numpy()
+        data = self.post_processors(input_tensor)
 
         output_tensor = self.post_processors(
             torch.cat(tuple(x[self.sample_idx : self.sample_idx + 1, ...].cpu() for x in outputs[1])),
             in_place=False,
-        ).numpy()
+        )
+
+        output_tensor = pl_module.output_mask.apply(output_tensor, dim=2, fill_value=np.nan).numpy()
+        data[1:, ...] = pl_module.output_mask.apply(data[1:, ...], dim=2, fill_value=np.nan)
+        data = data.numpy().squeeze()
 
         for rollout_step in range(pl_module.rollout):
             fig = plot_predicted_multilevel_flat_sample(
@@ -664,8 +693,8 @@ class PlotSample(BasePlotCallback):
                 self.latlons,
                 self.config.diagnostics.plot.accumulation_levels_plot,
                 self.config.diagnostics.plot.cmap_accumulation,
-                data[0, ...].squeeze(),
-                data[rollout_step + 1, ...].squeeze(),
+                data[0, ...],
+                data[rollout_step + 1, ...],
                 output_tensor[rollout_step, ...],
                 precip_and_related_fields=self.precip_and_related_fields,
             )
@@ -751,11 +780,15 @@ class PlotAdditionalMetrics(BasePlotCallback):
             ...,
             pl_module.data_indices.internal_data.output.full,
         ].cpu()
-        data = self.post_processors(input_tensor).numpy()
+        data = self.post_processors(input_tensor)
         output_tensor = self.post_processors(
             torch.cat(tuple(x[self.sample_idx : self.sample_idx + 1, ...].cpu() for x in outputs[1])),
             in_place=False,
-        ).numpy()
+        )
+
+        output_tensor = pl_module.output_mask.apply(output_tensor, dim=2, fill_value=np.nan).numpy()
+        data[1:, ...] = pl_module.output_mask.apply(data[1:, ...], dim=2, fill_value=np.nan)
+        data = data.numpy().squeeze()
 
         for rollout_step in range(pl_module.rollout):
             if len(self.parameters_histogram) > 0:
@@ -768,8 +801,8 @@ class PlotAdditionalMetrics(BasePlotCallback):
 
                 fig = plot_histogram(
                     plot_parameters_dict_histogram,
-                    data[0, ...].squeeze(),
-                    data[rollout_step + 1, ...].squeeze(),
+                    data[0, ...],
+                    data[rollout_step + 1, ...],
                     output_tensor[rollout_step, ...],
                     precip_and_related_fields=self.precip_and_related_fields,
                 )
@@ -793,8 +826,8 @@ class PlotAdditionalMetrics(BasePlotCallback):
                 fig = plot_power_spectrum(
                     plot_parameters_dict_spectrum,
                     self.latlons,
-                    data[0, ...].squeeze(),
-                    data[rollout_step + 1, ...].squeeze(),
+                    data[0, ...],
+                    data[rollout_step + 1, ...],
                     output_tensor[rollout_step, ...],
                 )
 

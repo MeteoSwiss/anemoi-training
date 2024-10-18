@@ -29,7 +29,8 @@ diagnostics:
     parameters: ???
     parameters_histogram: ???
     parameters_spectrum: [] # WIP: spectrum plots not supported for LAM
-    learned_features: False
+    learned_features: True
+    spatial_group_mask: cutout
 hardware:
   files:
     graph: ???
@@ -47,3 +48,7 @@ dataloader:
     validation: 100
 training:
   max_epochs: 5
+  loss_scaling:
+    spatial: # Scale area_weights spatially by the mask
+      graph_node_attribute: cutout
+      percentage: 0.5 # Percentage of the total loss weights
