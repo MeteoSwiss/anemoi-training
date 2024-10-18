@@ -168,7 +168,7 @@ class AnemoiDatasetsDataModule(pl.LightningDataModule):
     @cached_property
     def ds_predict(self) -> NativeGridDataset:
         return self._get_dataset(
-            open_dataset(OmegaConf.to_container(self.config.dataloader.train, resolve=True)),
+            open_dataset(OmegaConf.to_container(self.config.dataloader.training, resolve=True)),
             shuffle=False,
             label="predict",
         )
