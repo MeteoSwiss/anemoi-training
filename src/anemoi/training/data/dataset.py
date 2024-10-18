@@ -239,8 +239,12 @@ class NativeGridDataset(IterableDataset):
             x = self.data[start : end : self.timeincrement]
             if self.spatial_index is not None:
                 x = x[..., self.spatial_index]
-            x = rearrange(x, "dates variables ensemble gridpoints -> dates ensemble gridpoints variables")
-            self.ensemble_dim = 1
+            if self.label == "predict":
+                x = rearrange(x, "dates variables ensemble gridpoints -> ensemble dates gridpoints variables")
+                self.ensemble_dim = 0
+            else:
+                x = rearrange(x, "dates variables ensemble gridpoints -> dates ensemble gridpoints variables")
+                self.ensemble_dim = 1
 
             yield torch.from_numpy(x)
 
