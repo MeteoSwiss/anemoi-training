@@ -6,9 +6,9 @@
 # granted to it by virtue of its status as an intergovernmental organisation
 # nor does it submit to any jurisdiction.
 #
-
 from __future__ import annotations
 
+from abc import abstractmethod
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -21,14 +21,15 @@ if TYPE_CHECKING:
 class BaseMask:
     """Base class for masking model output."""
 
+    @abstractmethod
     def apply(self, x: torch.Tensor, *args, **kwargs) -> torch.Tensor:
-        return x
+        error_message = "Method `apply` must be implemented in subclass."
+        raise NotImplementedError(error_message)
 
-    def apply_inverse(self, x: torch.Tensor, *args, **kwargs) -> torch.Tensor:
-        return x
-
+    @abstractmethod
     def rollout_boundary(self, x: torch.Tensor, *args, **kwargs) -> torch.Tensor:
-        return x
+        error_message = "Method `rollout_boundary` must be implemented in subclass."
+        raise NotImplementedError(error_message)
 
 
 class Boolean1DMask(BaseMask):
@@ -41,7 +42,6 @@ class Boolean1DMask(BaseMask):
         assert x.shape[dim] == len(
             self.mask,
         ), f"Dimension mismatch: dimension {dim} has size {x.shape[dim]}, but mask length is {len(self.mask)}."
-
         target_shape = [1 for _ in range(x.ndim)]
         target_shape[dim] = len(self.mask)
         mask = self.mask.reshape(target_shape)
@@ -51,14 +51,25 @@ class Boolean1DMask(BaseMask):
     def _fill_masked_tensor(x: torch.Tensor, mask: torch.Tensor, fill_value: float | torch.Tensor) -> torch.Tensor:
         if isinstance(fill_value, torch.Tensor):
             return x.masked_scatter(mask, fill_value)
-
         return x.masked_fill(mask, fill_value)
 
-    def apply_inverse(self, x: torch.Tensor, dim: int, fill_value: float | torch.Tensor = np.nan) -> torch.Tensor:
-        mask = self.broadcast_like(x, dim)
-        return Boolean1DMask._fill_masked_tensor(x, mask, fill_value)
-
     def apply(self, x: torch.Tensor, dim: int, fill_value: float | torch.Tensor = np.nan) -> torch.Tensor:
+        """Apply the mask to the input tensor.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            The input tensor to be masked.
+        dim : int
+            The dimension along which to apply the mask.
+        fill_value : float | torch.Tensor, optional
+            The value to fill in the masked positions, by default np.nan.
+
+        Returns
+        -------
+        torch.Tensor
+            The masked tensor with fill_value in the positions where the mask is False.
+        """
         mask = self.broadcast_like(x, dim)
         return Boolean1DMask._fill_masked_tensor(x, ~mask, fill_value)
 
@@ -95,3 +106,9 @@ class Boolean1DMask(BaseMask):
 
 class NoOutputMask(BaseMask):
     """No output mask."""
+
+    def apply(self, x: torch.Tensor, *args, **kwargs) -> torch.Tensor:  # noqa: ARG002
+        return x
+
+    def rollout_boundary(self, x: torch.Tensor, *args, **kwargs) -> torch.Tensor:  # noqa: ARG002
+        return x

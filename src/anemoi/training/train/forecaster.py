@@ -82,13 +82,12 @@ class GraphForecaster(pl.LightningModule):
         self.save_hyperparameters()
 
         self.latlons_data = graph_data[config.graph.data].x
-        self.loss_weights = self.get_node_weights(graph_data, config)
+        self.loss_weights = graph_data[config.graph.data][config.model.node_loss_weight].squeeze()
 
         if config.model.get("output_mask", None) is not None:
             self.output_mask = Boolean1DMask(graph_data[config.graph.data][config.model.output_mask])
         else:
             self.output_mask = NoOutputMask()
-
         self.loss_weights = self.output_mask.apply(self.loss_weights, dim=0, fill_value=0.0)
 
         self.logger_enabled = config.diagnostics.log.wandb.enabled or config.diagnostics.log.mlflow.enabled

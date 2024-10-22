@@ -139,6 +139,13 @@ class BasePlotCallback(Callback, ABC):
         if self._executor is not None:
             self._executor.shutdown(wait=True)
 
+    def apply_output_mask(self, pl_module: pl.LightningModule, data: torch.Tensor) -> torch.Tensor:
+        if hasattr(pl_module, "output_mask") and pl_module.output_mask is not None:
+            # Fill with NaNs values where the mask is False
+            data[:, :, ~pl_module.output_mask, :] = np.nan
+
+        return data
+
     @abstractmethod
     @rank_zero_only
     def _plot(
@@ -684,7 +691,7 @@ class PlotSample(BasePlotCallback):
 
         output_tensor = pl_module.output_mask.apply(output_tensor, dim=2, fill_value=np.nan).numpy()
         data[1:, ...] = pl_module.output_mask.apply(data[1:, ...], dim=2, fill_value=np.nan)
-        data = data.numpy().squeeze()
+        data = data.numpy()
 
         for rollout_step in range(pl_module.rollout):
             fig = plot_predicted_multilevel_flat_sample(
@@ -693,8 +700,8 @@ class PlotSample(BasePlotCallback):
                 self.latlons,
                 self.config.diagnostics.plot.accumulation_levels_plot,
                 self.config.diagnostics.plot.cmap_accumulation,
-                data[0, ...],
-                data[rollout_step + 1, ...],
+                data[0, ...].squeeze(),
+                data[rollout_step + 1, ...].squeeze(),
                 output_tensor[rollout_step, ...],
                 precip_and_related_fields=self.precip_and_related_fields,
             )
@@ -788,7 +795,7 @@ class PlotAdditionalMetrics(BasePlotCallback):
 
         output_tensor = pl_module.output_mask.apply(output_tensor, dim=2, fill_value=np.nan).numpy()
         data[1:, ...] = pl_module.output_mask.apply(data[1:, ...], dim=2, fill_value=np.nan)
-        data = data.numpy().squeeze()
+        data = data.numpy()
 
         for rollout_step in range(pl_module.rollout):
             if len(self.parameters_histogram) > 0:
@@ -801,8 +808,8 @@ class PlotAdditionalMetrics(BasePlotCallback):
 
                 fig = plot_histogram(
                     plot_parameters_dict_histogram,
-                    data[0, ...],
-                    data[rollout_step + 1, ...],
+                    data[0, ...].squeeze(),
+                    data[rollout_step + 1, ...].squeeze(),
                     output_tensor[rollout_step, ...],
                     precip_and_related_fields=self.precip_and_related_fields,
                 )
@@ -826,8 +833,8 @@ class PlotAdditionalMetrics(BasePlotCallback):
                 fig = plot_power_spectrum(
                     plot_parameters_dict_spectrum,
                     self.latlons,
-                    data[0, ...],
-                    data[rollout_step + 1, ...],
+                    data[0, ...].squeeze(),
+                    data[rollout_step + 1, ...].squeeze(),
                     output_tensor[rollout_step, ...],
                 )
 
