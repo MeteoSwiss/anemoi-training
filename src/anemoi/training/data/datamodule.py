@@ -167,11 +167,21 @@ class AnemoiDatasetsDataModule(pl.LightningDataModule):
     
     @cached_property
     def ds_predict(self) -> NativeGridDataset:
-        return self._get_dataset(
-            open_dataset(OmegaConf.to_container(self.config.dataloader.training, resolve=True)),
+        r = self.rollout
+        if self.config.diagnostics.eval.enabled:
+            r = max(r, self.config.diagnostics.eval.rollout)
+        data = NativeGridDataset(
+            data_reader=open_dataset(OmegaConf.to_container(self.config.dataloader.training, resolve=True)),
+            rollout=r,
+            multistep=self.config.training.multistep_input,
+            timeincrement=self.timeincrement,
+            model_comm_group_rank=0,
+            model_comm_group_id=0,
+            model_comm_num_groups=1,
             shuffle=False,
             label="predict",
         )
+        return data
 
     def _get_dataset(
         self,
